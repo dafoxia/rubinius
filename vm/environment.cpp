@@ -22,7 +22,7 @@
 #include "util/logger.hpp"
 
 #ifdef ENABLE_LLVM
-#include "llvm/state.hpp"
+#include "jit/llvm/state.hpp"
 #include <llvm/Support/ManagedStatic.h>
 #endif
 

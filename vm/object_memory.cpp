@@ -14,7 +14,7 @@
 #include "gc/walker.hpp"
 
 #if ENABLE_LLVM
-#include "llvm/state.hpp"
+#include "jit/llvm/state.hpp"
 #endif
 
 #include "on_stack.hpp"
