@@ -35,9 +35,7 @@ namespace rubinius {
     GlobalCache* global_cache_;
     ThreadList* threads_;
     std::list<capi::GlobalHandle*>* global_handle_locations_;
-#ifdef ENABLE_LLVM
     LLVMState* llvm_state_;
-#endif
     size_t young_bytes_allocated_;
     size_t mature_bytes_allocated_;
     size_t code_bytes_allocated_;
@@ -70,11 +68,9 @@ namespace rubinius {
       return global_handle_locations_;
     }
 
-#ifdef ENABLE_LLVM
     LLVMState* llvm_state() {
       return llvm_state_;
     }
-#endif
 
     size_t young_bytes_allocated() const {
       return young_bytes_allocated_;

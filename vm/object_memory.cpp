@@ -13,9 +13,7 @@
 #include "gc/inflated_headers.hpp"
 #include "gc/walker.hpp"
 
-#if ENABLE_LLVM
 #include "jit/llvm/state.hpp"
-#endif
 
 #include "on_stack.hpp"
 
@@ -817,11 +815,7 @@ step1:
 
   // TODO: delete after metrics
   size_t ObjectMemory::jit_bytes_allocated() const {
-#if ENABLE_LLVM
     return shared_.llvm_state->code_bytes();
-#else
-    return 0;
-#endif
   }
 
   void ObjectMemory::add_type_info(TypeInfo* ti) {

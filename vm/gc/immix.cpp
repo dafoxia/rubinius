@@ -8,9 +8,7 @@
 
 #include "configuration.hpp"
 
-#ifdef ENABLE_LLVM
 #include "jit/llvm/state.hpp"
-#endif
 
 namespace rubinius {
   void ImmixGC::ObjectDescriber::added_chunk(int count) {
@@ -210,9 +208,7 @@ namespace rubinius {
       }
     }
 
-#ifdef ENABLE_LLVM
     if(LLVMState* ls = data->llvm_state()) ls->gc_scan(this);
-#endif
   }
 
   void ImmixGC::collect_finish(GCData* data) {
