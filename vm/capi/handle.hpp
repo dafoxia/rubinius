@@ -3,7 +3,7 @@
 
 #include "detection.hpp"
 
-#if __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070
+#if defined(__APPLE__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 1070
 #ifndef RBX_HAVE_TR1_HASH
 #include "missing/leopard_hashtable.hpp"
 #endif
@@ -23,6 +23,7 @@
 struct RArray;
 struct RString;
 struct RData;
+struct RTypedData;
 struct RFloat;
 struct RIO;
 struct RFile;
@@ -58,6 +59,7 @@ namespace rubinius {
         RArray*     rarray;
         RString*    rstring;
         RData*      rdata;
+        RTypedData* rtypeddata;
         RFloat*     rfloat;
         RIO*        rio;
         RFile*      rfile;
@@ -191,6 +193,7 @@ namespace rubinius {
       }
 
       RData*  as_rdata(NativeMethodEnvironment* env);
+      RTypedData*  as_rtypeddata(NativeMethodEnvironment* env);
       RArray* as_rarray(NativeMethodEnvironment* env);
       RString* as_rstring(NativeMethodEnvironment* env, int cache_level);
       RFloat* as_rfloat(NativeMethodEnvironment* env);

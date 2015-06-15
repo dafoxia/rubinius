@@ -89,7 +89,101 @@
 # endif
 #endif
 
-#define LONG_LONG long long
+#if SIZEOF_LONG_LONG > 0
+# define LONG_LONG long long
+#endif
+
+#if SIZEOF_LONG == SIZEOF_VOIDP
+# define SIGNED_VALUE long
+# define SIZEOF_VALUE SIZEOF_LONG
+# define PRI_VALUE_PREFIX "l"
+#elif SIZEOF_LONG_LONG == SIZEOF_VOIDP
+# define SIGNED_VALUE LONG_LONG
+# define LONG_LONG_VALUE 1
+# define SIZEOF_VALUE SIZEOF_LONG_LONG
+# define PRI_VALUE_PREFIX "ll"
+#else
+# error ---->> ruby requires sizeof(void*) == sizeof(long) to be compiled. <<----
+#endif
+
+#ifndef PRI_INT_PREFIX
+#define PRI_INT_PREFIX ""
+#endif
+#ifndef PRI_LONG_PREFIX
+#define PRI_LONG_PREFIX "l"
+#endif
+
+#if SIZEOF_LONG == 8
+#define PRI_64_PREFIX PRI_LONG_PREFIX
+#elif SIZEOF_LONG_LONG == 8
+#define PRI_64_PREFIX PRI_LL_PREFIX
+#endif
+
+#define RUBY_PRI_VALUE_MARK "\v"
+#if defined PRIdPTR && !defined PRI_VALUE_PREFIX
+#define PRIdVALUE PRIdPTR
+#define PRIoVALUE PRIoPTR
+#define PRIuVALUE PRIuPTR
+#define PRIxVALUE PRIxPTR
+#define PRIXVALUE PRIXPTR
+#define PRIsVALUE PRIiPTR"" RUBY_PRI_VALUE_MARK
+#else
+#define PRIdVALUE PRI_VALUE_PREFIX"d"
+#define PRIoVALUE PRI_VALUE_PREFIX"o"
+#define PRIuVALUE PRI_VALUE_PREFIX"u"
+#define PRIxVALUE PRI_VALUE_PREFIX"x"
+#define PRIXVALUE PRI_VALUE_PREFIX"X"
+#define PRIsVALUE PRI_VALUE_PREFIX"i" RUBY_PRI_VALUE_MARK
+#endif
+#ifndef PRI_VALUE_PREFIX
+# define PRI_VALUE_PREFIX ""
+#endif
+
+#ifndef PRI_TIMET_PREFIX
+# if SIZEOF_TIME_T == SIZEOF_INT
+#  define PRI_TIMET_PREFIX
+# elif SIZEOF_TIME_T == SIZEOF_LONG
+#  define PRI_TIMET_PREFIX "l"
+# elif SIZEOF_TIME_T == SIZEOF_LONG_LONG
+#  define PRI_TIMET_PREFIX PRI_LL_PREFIX
+# endif
+#endif
+
+#if defined PRI_PTRDIFF_PREFIX
+#elif SIZEOF_PTRDIFF_T == SIZEOF_INT
+# define PRI_PTRDIFF_PREFIX ""
+#elif SIZEOF_PTRDIFF_T == SIZEOF_LONG
+# define PRI_PTRDIFF_PREFIX "l"
+#elif SIZEOF_PTRDIFF_T == SIZEOF_LONG_LONG
+# define PRI_PTRDIFF_PREFIX PRI_LL_PREFIX
+#endif
+#define PRIdPTRDIFF PRI_PTRDIFF_PREFIX"d"
+#define PRIiPTRDIFF PRI_PTRDIFF_PREFIX"i"
+#define PRIoPTRDIFF PRI_PTRDIFF_PREFIX"o"
+#define PRIuPTRDIFF PRI_PTRDIFF_PREFIX"u"
+#define PRIxPTRDIFF PRI_PTRDIFF_PREFIX"x"
+#define PRIXPTRDIFF PRI_PTRDIFF_PREFIX"X"
+
+#if defined PRI_SIZE_PREFIX
+#elif SIZEOF_SIZE_T == SIZEOF_INT
+# define PRI_SIZE_PREFIX ""
+#elif SIZEOF_SIZE_T == SIZEOF_LONG
+# define PRI_SIZE_PREFIX "l"
+#elif SIZEOF_SIZE_T == SIZEOF_LONG_LONG
+# define PRI_SIZE_PREFIX PRI_LL_PREFIX
+#endif
+#define PRIdSIZE PRI_SIZE_PREFIX"d"
+#define PRIiSIZE PRI_SIZE_PREFIX"i"
+#define PRIoSIZE PRI_SIZE_PREFIX"o"
+#define PRIuSIZE PRI_SIZE_PREFIX"u"
+#define PRIxSIZE PRI_SIZE_PREFIX"x"
+#define PRIXSIZE PRI_SIZE_PREFIX"X"
+
+#ifdef __GNUC__
+#define RB_UNUSED_VAR(x) x __attribute__ ((unused))
+#else
+#define RB_UNUSED_VAR(x) x
+#endif
 
 #ifndef RUBY_EXTERN
 #define RUBY_EXTERN extern
@@ -219,6 +313,9 @@ struct RString {
 #define RSTRING(str)    capi_rstring_struct(str, RSTRING_CACHE_UNSAFE)
 #endif
 
+#define RSTRING_GETMEM(rb_str, c_str, c_str_len) \
+  ((c_str) = RSTRING_PTR(rb_str), (c_str_len) = RSTRING_LEN(rb_str))
+
 struct RArray {
   ssize_t len;
   struct {
@@ -238,6 +335,7 @@ struct RData {
 };
 
 #define RDATA(d)        capi_rdata_struct(d)
+#define RTYPEDDATA(d)   capi_rtypeddata_struct(d)
 
 struct RFloat {
   double value;
@@ -249,6 +347,8 @@ struct RFloat {
 // Do not define these messages as strings. We want a syntax error.
 #define RHASH(obj)      ({ C_API_RHASH_is_not_supported_in_Rubinius })
 #define RHASH_TBL(obj)  ({ C_API_RHASH_TBL_is_not_supported_in_Rubinius })
+
+#define RHASH_SET_IFNONE(hash, def) rb_hash_set_ifnone(hash, def)
 
 typedef struct rb_io_t {
   VALUE handle;
@@ -381,8 +481,18 @@ struct RFile {
 /** Reallocate memory allocated with ALLOC or ALLOC_N. */
 #define REALLOC_N(ptr, type, n) (ptr)=(type*)realloc(ptr, sizeof(type) * (n));
 
+#define ZALLOC_N(type,n) ((type*)xcalloc((n),sizeof(type)))
+#define ZALLOC(type) (ZALLOC_N(type,1))
+
+#define ALLOCV(v, n) rb_alloc_tmp_buffer(&(v), (n))
+#define ALLOCV_N(type, v, n) ((type*)ALLOCV((v), sizeof(type)*(n)))
+#define ALLOCV_END(v) rb_free_tmp_buffer(&(v))
+
 /** Interrupt checking (no-op). */
 #define CHECK_INTS        /* No-op */
+
+#define RB_BLOCK_CALL_FUNC_ARGLIST(yielded_arg, callback_arg) \
+    VALUE yielded_arg, VALUE callback_arg, int argc, const VALUE *argv, VALUE blockarg
 
 /** Rubinius doesn't need gc guards */
 #define RB_GC_GUARD       /* No-op */
@@ -482,6 +592,7 @@ VALUE rb_uint2big(unsigned long number);
 
 /** The length of string str. */
 #define RSTRING_LEN(str)  rb_str_len(str)
+#define RSTRING_LENINT(str) rb_str_len(str)
 
 /** The pointer to the string str's data. */
 #ifdef RUBY_READONLY_STRING
@@ -513,11 +624,15 @@ VALUE rb_uint2big(unsigned long number);
 
 #define Check_SafeStr(x)
 
+#define FilePathValue(v)      rb_file_path_value(&(v))
+
 /** Retrieve the ID given a Symbol handle. */
 #define SYM2ID(sym)       (sym)
 
 /** Return an integer type id for the object. @see rb_type() */
 #define TYPE(handle)      rb_type(handle)
+#define rb_type_p(obj, type) (rb_type(obj) == (type))
+#define RB_TYPE_P(obj, type) rb_type_p(obj, type)
 
 /** Alias to rb_type. This is not exactly the same as in MRI, but it makes sure
 + * that it won't segfault if you give BUILTIN_TYPE an immediate such as a Fixnum
@@ -592,6 +707,7 @@ VALUE rb_uint2big(unsigned long number);
 
   struct RArray* capi_rarray_struct(VALUE array);
   struct RData* capi_rdata_struct(VALUE data);
+  struct RTypedData* capi_rtypeddata_struct(VALUE data);
   struct RString* capi_rstring_struct(VALUE string, int cache_level);
   struct RFloat* capi_rfloat_struct(VALUE data);
   struct RIO* capi_rio_struct(VALUE handle);
@@ -625,19 +741,78 @@ VALUE rb_uint2big(unsigned long number);
   VALUE rb_equal(VALUE a, VALUE b);
   VALUE rb_class_inherited_p(VALUE mod, VALUE arg);
 
-#define   Data_Make_Struct(klass, type, mark, free, sval) (\
-            sval = ALLOC(type), \
-            memset(sval, 0, sizeof(type)), \
-            Data_Wrap_Struct(klass, mark, free, sval)\
-          )
+  typedef struct rb_data_type_struct rb_data_type_t;
 
-#define   Data_Wrap_Struct(klass, mark, free, sval) \
-            rb_data_object_alloc(klass, (void*)sval, (RUBY_DATA_FUNC)mark, \
-                                 (RUBY_DATA_FUNC)free)
+  struct rb_data_type_struct {
+    const char *wrap_struct_name;
+    struct {
+      void (*dmark)(void*);
+      void (*dfree)(void*);
+      size_t (*dsize)(const void *);
+      void *reserved[2]; /* For future extension.
+                            This array *must* be filled with ZERO. */
+    } function;
+    const rb_data_type_t *parent;
+    void *data;        /* This area can be used for any purpose
+                          by a programmer who define the type. */
+    VALUE flags;       /* FL_WB_PROTECTED */
+  };
 
-#define   Data_Get_Struct(obj,type,sval) do {\
-            Check_Type(obj, T_DATA); \
-            sval = (type*)DATA_PTR(obj);\
+#define HAVE_TYPE_RB_DATA_TYPE_T 1
+#define HAVE_RB_DATA_TYPE_T_FUNCTION 1
+#define HAVE_RB_DATA_TYPE_T_PARENT 1
+
+struct RTypedData {
+    const rb_data_type_t *type;
+    VALUE typed_flag; /* 1 or not */
+    void *data;
+};
+
+#define RTYPEDDATA_P(v)    (RTYPEDDATA(v)->typed_flag == 1)
+#define RTYPEDDATA_TYPE(v) (RTYPEDDATA(v)->type)
+#define RTYPEDDATA_DATA(v) (RTYPEDDATA(v)->data)
+
+  VALUE rb_data_object_alloc(VALUE,void*,RUBY_DATA_FUNC,RUBY_DATA_FUNC);
+  VALUE rb_data_typed_object_alloc(VALUE klass, void *datap, const rb_data_type_t *);
+  int rb_typeddata_inherited_p(const rb_data_type_t *child, const rb_data_type_t *parent);
+  int rb_typeddata_is_kind_of(VALUE, const rb_data_type_t *);
+  void *rb_check_typeddata(VALUE, const rb_data_type_t *);
+
+#define Check_TypedStruct(v,t)        rb_check_typeddata((VALUE)(v),(t))
+#define RUBY_DEFAULT_FREE             ((RUBY_DATA_FUNC)-1)
+#define RUBY_NEVER_FREE               ((RUBY_DATA_FUNC)0)
+#define RUBY_TYPED_DEFAULT_FREE       RUBY_DEFAULT_FREE
+#define RUBY_TYPED_NEVER_FREE         RUBY_NEVER_FREE
+
+  /* bits for rb_data_type_struct::flags */
+#define RUBY_TYPED_FREE_IMMEDIATELY   0xcafebeef
+#define RUBY_TYPED_WB_PROTECTED       0xbeefcafe
+
+#define Data_Wrap_Struct(klass,mark,free,sval)\
+    rb_data_object_alloc((klass),(sval),(RUBY_DATA_FUNC)(mark),(RUBY_DATA_FUNC)(free))
+
+#define Data_Make_Struct(klass,type,mark,free,sval) (\
+    (sval) = ALLOC(type),\
+    memset((sval), 0, sizeof(type)),\
+    Data_Wrap_Struct((klass),(mark),(free),(sval))\
+)
+
+#define TypedData_Wrap_Struct(klass,data_type,sval)\
+  rb_data_typed_object_alloc((klass),(sval),(data_type))
+
+#define TypedData_Make_Struct(klass, type, data_type, sval) (\
+    (sval) = ALLOC(type),\
+    memset((sval), 0, sizeof(type)),\
+    TypedData_Wrap_Struct((klass),(data_type),(sval))\
+)
+
+#define Data_Get_Struct(obj,type,sval) do {\
+    Check_Type((obj), T_DATA); \
+    (sval) = (type*)DATA_PTR(obj);\
+} while (0)
+
+#define TypedData_Get_Struct(obj,type,data_type,sval) do {\
+    (sval) = (type*)rb_check_typeddata((obj), (data_type)); \
 } while (0)
 
   /** Return Qtrue if obj is an immediate, Qfalse or Qnil. */
@@ -859,6 +1034,7 @@ VALUE rb_uint2big(unsigned long number);
 
   /** Returns String representation of the class' name. */
   VALUE   rb_class_name(VALUE klass);
+#define rb_class_path(k)    rb_class_name(k)
 
   /** Calls the class method 'inherited' on super passing the class.
    *  If super is NULL, calls Object.inherited. */
@@ -873,6 +1049,9 @@ VALUE rb_uint2big(unsigned long number);
 
   /** Returns the Class object this object is an instance of. */
   VALUE   rb_class_of(VALUE object);
+
+  /** Returns the superclass of a class. */
+  VALUE   rb_class_superclass(VALUE klass);
 
   /** Returns the first superclass of an object that isn't a singleton or
     * intermediate.
@@ -1061,6 +1240,9 @@ VALUE rb_uint2big(unsigned long number);
 
   VALUE rb_vsprintf(const char *format, va_list varargs);
 
+  /** Returns a duplicate file discriptor with close-on-exec flag set. */
+  int rb_cloexec_dup(int fd);
+
   /** Returns a File opened with the specified mode. */
   VALUE rb_file_open(const char* name, const char* mode);
 
@@ -1115,6 +1297,8 @@ VALUE rb_uint2big(unsigned long number);
   /** Return the value associated with the key, excluding default values. */
   VALUE   rb_hash_lookup(VALUE self, VALUE key);
 
+  VALUE   rb_hash_lookup2(VALUE hash, VALUE key, VALUE def);
+
   /** Set the value associated with the key. */
   VALUE   rb_hash_aset(VALUE self, VALUE key, VALUE value);
 
@@ -1135,6 +1319,8 @@ VALUE rb_uint2big(unsigned long number);
   void rb_hash_foreach(VALUE self,
                        int (*func)(ANYARGS),
                        VALUE farg);
+
+  VALUE rb_hash_set_ifnone(VALUE hash, VALUE def);
 
   void    rb_eof_error();
 
@@ -1232,6 +1418,8 @@ VALUE rb_uint2big(unsigned long number);
   /** Convert string to an ID */
   ID      rb_intern(const char* string);
   ID      rb_intern2(const char* string, long len);
+
+  VALUE rb_sym2str(VALUE sym);
 
   /** Coerce x and y and perform 'x func y' */
   VALUE rb_num_coerce_bin(VALUE x, VALUE y, ID func);
@@ -1572,6 +1760,9 @@ VALUE rb_uint2big(unsigned long number);
    * to check that length is greater than 0 properly */
   VALUE   rb_str_new(const char* string, long length);
 
+  /** Create a String from a C string. Alias of rb_str_new2. */
+  VALUE rb_str_new_cstr(const char* string);
+
   /** Create a String from a C string. */
   VALUE   rb_str_new2(const char* string);
 
@@ -1759,6 +1950,8 @@ VALUE rb_uint2big(unsigned long number);
   NORETURN(void rb_fatal(const char *fmt, ...));
 
   NORETURN(void rb_notimplement());
+
+  NORETURN(VALUE rb_f_notimplement(int argc, VALUE *argv, VALUE obj));
 
   /** Raises an ArgumentError exception. */
   NORETURN(void rb_invalid_str(const char *str, const char *type));
